@@ -19,6 +19,8 @@
 #include "depthai_bridge/BridgePublisher.hpp"
 #include "depthai_bridge/DisparityConverter.hpp"
 #include "depthai_bridge/ImageConverter.hpp"
+#include "std_msgs/msg/float32.hpp"
+
 
 std::tuple<dai::Pipeline, int, int> createPipeline(
     bool withDepth, bool lrcheck, bool extended, bool subpixel, int confidence, int LRchecktresh, std::string resolution) {
@@ -66,8 +68,11 @@ std::tuple<dai::Pipeline, int, int> createPipeline(
     // MonoCamera
     monoLeft->setResolution(monoResolution);
     monoLeft->setBoardSocket(dai::CameraBoardSocket::CAM_B);
+    monoLeft->setFps(20);
     monoRight->setResolution(monoResolution);
     monoRight->setBoardSocket(dai::CameraBoardSocket::CAM_C);
+    monoRight->setFps(20);
+
 
     // StereoDepth
     stereo->initialConfig.setConfidenceThreshold(confidence);
@@ -101,7 +106,7 @@ int main(int argc, char** argv) {
     bool lrcheck, extended, subpixel, enableDepth;
     int confidence, LRchecktresh;
     int monoWidth, monoHeight;
-    dai::Pipeline pipeline;
+    dai::Pipeline pipeline;  
 
     node->declare_parameter("tf_prefix", "oak");
     node->declare_parameter("mode", "depth");
@@ -129,13 +134,28 @@ int main(int argc, char** argv) {
 
     std::tie(pipeline, monoWidth, monoHeight) = createPipeline(enableDepth, lrcheck, extended, subpixel, confidence, LRchecktresh, monoResolution);
     dai::Device device(pipeline);
-    auto leftQueue = device.getOutputQueue("left", 30, false);
-    auto rightQueue = device.getOutputQueue("right", 30, false);
+    
+    auto temp_pub = node->create_publisher<std_msgs::msg::Float32>("oakd/chip_temperature", 10);
+    auto temp_timer = node->create_wall_timer(
+        std::chrono::seconds(2),
+        [node, &device, temp_pub]() {
+            try {
+                auto temps = device.getChipTemperature();
+                std_msgs::msg::Float32 msg;
+                msg.data = temps.average;
+                temp_pub->publish(msg);
+            } catch(const std::exception& e) {
+                RCLCPP_WARN(node->get_logger(), "Failed to read chip temperature: %s", e.what());
+            }
+        });
+    
+    auto leftQueue = device.getOutputQueue("left", 20, false);
+    auto rightQueue = device.getOutputQueue("right", 20, false);
     std::shared_ptr<dai::DataOutputQueue> stereoQueue;
     if(enableDepth) {
-        stereoQueue = device.getOutputQueue("depth", 30, false);
+        stereoQueue = device.getOutputQueue("depth", 20, false);
     } else {
-        stereoQueue = device.getOutputQueue("disparity", 30, false);
+        stereoQueue = device.getOutputQueue("disparity", 20, false);
     }
 
     auto calibrationHandler = device.readCalibration();
@@ -153,7 +173,7 @@ int main(int argc, char** argv) {
         node,
         std::string("left/image_rect"),
         std::bind(&dai::rosBridge::ImageConverter::toRosMsg, &converter, std::placeholders::_1, std::placeholders::_2),
-        30,
+        20,
         leftCameraInfo,
         "left");
 
@@ -167,7 +187,7 @@ int main(int argc, char** argv) {
         node,
         std::string("right/image_rect"),
         std::bind(&dai::rosBridge::ImageConverter::toRosMsg, &rightconverter, std::placeholders::_1, std::placeholders::_2),
-        30,
+        20,
         rightCameraInfo,
         "right");
 
@@ -183,7 +203,7 @@ int main(int argc, char** argv) {
                                         // and image type is also same we can reuse it
                       std::placeholders::_1,
                       std::placeholders::_2),
-            30,
+            20,
             rightCameraInfo,
             "stereo");
         depthPublish.addPublisherCallback();
@@ -195,7 +215,7 @@ int main(int argc, char** argv) {
             node,
             std::string("stereo/disparity"),
             std::bind(&dai::rosBridge::DisparityConverter::toRosMsg, &dispConverter, std::placeholders::_1, std::placeholders::_2),
-            30,
+            20,
             rightCameraInfo,
             "stereo");
         dispPublish.addPublisherCallback();

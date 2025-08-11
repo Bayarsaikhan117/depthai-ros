@@ -11,6 +11,8 @@
 #include "rclcpp/callback_group.hpp"
 #include "rclcpp/node.hpp"
 #include "std_srvs/srv/trigger.hpp"
+#include "std_msgs/msg/float32.hpp"
+
 
 namespace dai {
 class Pipeline;
@@ -98,5 +100,9 @@ class Camera : public rclcpp::Node {
     std::unique_ptr<dai::ros::TFPublisher> tfPub;
     rclcpp::TimerBase::SharedPtr startTimer;
     rclcpp::CallbackGroup::SharedPtr srvGroup;
+    
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr chip_temp_pub_;
+    rclcpp::TimerBase::SharedPtr chip_temp_timer_;
+
 };
 }  // namespace depthai_ros_driver

@@ -7,10 +7,28 @@
 #include "depthai_bridge/TFPublisher.hpp"
 #include "depthai_ros_driver/pipeline/pipeline_generator.hpp"
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
+#include "std_msgs/msg/float32.hpp"
+#include <memory>
 
 namespace depthai_ros_driver {
 
 Camera::Camera(const rclcpp::NodeOptions& options) : rclcpp::Node("camera", options) {
+	
+	// Температур publish хийх publisher болон timer-ийг зарлана
+	chip_temp_pub_ = this->create_publisher<std_msgs::msg::Float32>("oakd/chip_temperature", 10);
+
+    chip_temp_timer_ = this->create_wall_timer(
+        std::chrono::seconds(2),
+        [this]() {
+            if(device) {
+                auto temps = device->getChipTemperature();
+                std_msgs::msg::Float32 temp_msg;
+                temp_msg.data = temps.average;
+                chip_temp_pub_->publish(temp_msg);
+            }
+        });
+	
+	
     //  Since we cannot use shared_from this before the object is initialized, we need to use a timer to start the device.
     startTimer = this->create_wall_timer(std::chrono::seconds(1), [this]() {
         ph = std::make_unique<param_handlers::CameraParamHandler>(shared_from_this(), "camera");

@@ -1,6 +1,25 @@
-/oak:
+oak:
   ros__parameters:
     camera:
       i_nn_type: none
+      i_pipeline_type: "RGBD" 
+      i_manual_exposure: 3000
+      i_manual_iso: 800
+      i_get_base_device_timestamp: false 
+      i_enable_imu: true
+    imu:
+      i_acc_freq: 200   # Хурдатгалын мэдрэгчийн давтамж (Hz)
+      i_gyro_freq: 200  # Эргэлтийн мэдрэгчийн давтамж (Hz)
+
     stereo:
       i_subpixel: true
+      i_left_rect_publish_topic: true
+      i_right_rect_publish_topic: true 
+      i_publish_topic: true # Энэ нь depth image-г /oak/stereo/image_raw topic-оор гаргана
+      i_fps: 15.0
+      i_width: 640
+      i_height: 400
+    rgb:
+      i_fps: 15.0
+      i_width: 640
+      i_height: 400
